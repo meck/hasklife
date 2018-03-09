@@ -40,6 +40,8 @@ executables:
     dependencies:
     - hasklife
     - gloss
+    - optparse-applicative
+    - split
 
 tests:
   hasklife-test:
