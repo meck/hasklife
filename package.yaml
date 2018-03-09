@@ -27,6 +27,7 @@ library:
   dependencies:
     - containers
     - split
+    - random
 
 executables:
   hasklife:

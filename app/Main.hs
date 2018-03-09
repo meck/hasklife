@@ -1,9 +1,9 @@
 module Main where
 
-import Logic
+import           Logic
 
-import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Game
+import           Graphics.Gloss
+import           Graphics.Gloss.Interface.IO.Game
 
 iniWidth, iniHeight, offset :: Int
 iniWidth = 1000
@@ -13,7 +13,7 @@ iniHeight = iniWidth `div` 2
 offset = 30
 
 cellsize :: Int
-cellsize = 7
+cellsize = 3
 
 cellsizeF :: Float
 cellsizeF = fromIntegral cellsize
@@ -34,11 +34,11 @@ textScale :: Float
 textScale = 0.2
 
 data World = World
-  { grid :: Grid
-  , itter :: Int
+  { grid   :: Grid
+  , itter  :: Int
   , paused :: Bool
-  , winW :: Int
-  , winH :: Int
+  , winW   :: Int
+  , winH   :: Int
   }
 
 initialWorld :: World
@@ -62,8 +62,8 @@ gridToPicture g = pictures $ celltoPict <$> gridToList g
       $ polygon
       $ rectanglePath cellsizeF cellsizeF
 
-worldToPicture :: World -> Picture
-worldToPicture w = pictures [it, gridToPicture $ grid w]
+worldToPicture :: World -> IO Picture
+worldToPicture w = return $ pictures [it, gridToPicture $ grid w]
  where
   it =
     translate (10 + fromIntegral (winW w `div` (-2)))
@@ -74,30 +74,39 @@ worldToPicture w = pictures [it, gridToPicture $ grid w]
       $  "Iterations: "
       ++ show (itter w)
 
-stepWorld :: Float -> World -> World
+stepWorld :: Float -> World -> IO World
 stepWorld _ w = if paused w
-  then w
-  else w { grid = evolveGrid $ grid w, itter = succ $ itter w }
+  then return w
+  else return $ w { grid = evolveGrid $ grid w, itter = succ $ itter w }
 
-handleInput :: Event -> World -> World
+handleInput :: Event -> World -> IO World
+handleInput event w = case event of
 -- Pause Game with Space
-handleInput (EventKey (SpecialKey KeySpace) Down _ _) w =
-  w { paused = not (paused w) }
+  (EventKey (SpecialKey KeySpace) Down _ _) ->
+    return $ w { paused = not (paused w) }
 -- Toggle cell with left mouse click
-handleInput (EventKey (MouseButton LeftButton) Down _ (x, y)) w = if paused w
-  then w { grid = toggleCord (scalePix x, scalePix y) (grid w) }
-  else w
-  where scalePix x = truncate $ signum x * (abs x + cellsizeF / 2) / cellsizeF
+  (EventKey (MouseButton LeftButton) Down _ (x, y)) -> if paused w
+    then return $ w { grid = toggleCord (scalePix x, scalePix y) (grid w) }
+    else return w
+-- Randomize the grid with r
+  (EventKey (Char r) Down _ _) -> if paused w
+    then do
+      let wid = div iniWidth $ 2 * cellsize
+          hig = div iniHeight $ 2 * cellsize
+      ng <- randomGrid (negate wid, negate hig) (wid, hig)
+      return w { grid = ng, itter = 0 }
+    else return w
 -- Update the windowsize
-handleInput (EventResize (x, y)) w = w { winW = x, winH = y }
+  (EventResize (x, y)) -> return $ w { winW = x, winH = y }
 -- All other input
-handleInput _                    w = w
+  _                    -> return w
+  where scalePix x = truncate $ signum x * (abs x + cellsizeF / 2) / cellsizeF
 
 main :: IO ()
-main = play window
-            background
-            stepsPerSec
-            initialWorld
-            worldToPicture
-            handleInput
-            stepWorld
+main = playIO window
+              background
+              stepsPerSec
+              initialWorld
+              worldToPicture
+              handleInput
+              stepWorld
