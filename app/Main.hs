@@ -1,9 +1,9 @@
 module Main where
 
-import           Logic
-
+import           Data.List                        (mapAccumL)
 import           Graphics.Gloss
 import           Graphics.Gloss.Interface.IO.Game
+import           Logic
 
 iniWidth, iniHeight, offset :: Int
 iniWidth = 1000
@@ -30,24 +30,31 @@ cellColor = makeColorI 129 161 193 255
 textColor :: Color
 textColor = makeColorI 216 222 233 255
 
+helpColor :: Color
+helpColor = makeColorI 235 203 139 255
 textScale :: Float
 textScale = 0.2
 
+textScaleSmall :: Float
+textScaleSmall = 0.15
+
 data World = World
-  { grid   :: Grid
-  , itter  :: Int
-  , paused :: Bool
-  , winW   :: Int
-  , winH   :: Int
+  { grid     :: Grid
+  , itter    :: Int
+  , paused   :: Bool
+  , winW     :: Int
+  , winH     :: Int
+  , showHelp :: Bool
   }
 
 initialWorld :: World
 initialWorld = World
-  { grid   = rPentomino
-  , itter  = 0
-  , paused = True
-  , winW   = iniWidth
-  , winH   = iniHeight
+  { grid     = rPentomino
+  , itter    = 0
+  , paused   = True
+  , winW     = iniWidth
+  , winH     = iniHeight
+  , showHelp = False
   }
 
 window :: Display
@@ -63,42 +70,78 @@ gridToPicture g = pictures $ celltoPict <$> gridToList g
       $ rectanglePath cellsizeF cellsizeF
 
 worldToPicture :: World -> IO Picture
-worldToPicture w = return $ pictures [it, gridToPicture $ grid w]
+worldToPicture w = return $ pictures
+  [ if showHelp w then helpPicture (winW w) (winH w) else blank
+  , itterPicture (winW w) (winH w) (itter w)
+  , gridToPicture $ grid w
+  ]
+
+itterPicture :: Int -> Int -> Int -> Picture
+itterPicture width hight i =
+  translate (10 + fromIntegral (width `div` (-2)))
+            ((-10) + fromIntegral (hight `div` 2) - (100 * textScale))
+    $  scale textScale textScale
+    $  color textColor
+    $  text
+    $  "Iterations: "
+    ++ show i
+
+helpPicture :: Int -> Int -> Picture
+helpPicture width height =
+  translate
+      (10 + fromIntegral (width `div` (-2)))
+      ( (-20 - 100 * textScale)
+      + fromIntegral (height `div` 2)
+      - (100 * textScale)
+      )
+    $ color helpColor
+    $ pictures
+    $ snd
+    $ mapAccumL
+        go
+        0
+        [ "Space to Pause"
+        , "When Paused:"
+        , " C: clear screen"
+        , " R: randomize"
+        , " Click: Add or remove Cell"
+        ]
  where
-  it =
-    translate (10 + fromIntegral (winW w `div` (-2)))
-              ((-10) + fromIntegral (winH w `div` 2) - (100 * textScale))
-      $  scale textScale textScale
-      $  color textColor
-      $  text
-      $  "Iterations: "
-      ++ show (itter w)
+  go acc l =
+    ( acc - 150 * textScaleSmall
+    , translate 0 acc $ scale textScaleSmall textScaleSmall $ text l
+    )
 
 stepWorld :: Float -> World -> IO World
 stepWorld _ w = if paused w
   then return w
   else return $ w { grid = evolveGrid $ grid w, itter = succ $ itter w }
 
+-- Pause Game with Space
+-- Show help with 'h'
+-- Toggle cell with left mouse click
+-- Clear with 'c'
+-- Randomize the grid with 'r'
 handleInput :: Event -> World -> IO World
 handleInput event w = case event of
--- Pause Game with Space
   (EventKey (SpecialKey KeySpace) Down _ _) ->
     return $ w { paused = not (paused w) }
--- Toggle cell with left mouse click
   (EventKey (MouseButton LeftButton) Down _ (x, y)) -> if paused w
     then return $ w { grid = toggleCord (scalePix x, scalePix y) (grid w) }
     else return w
--- Randomize the grid with r
-  (EventKey (Char r) Down _ _) -> if paused w
-    then do
-      let wid = div iniWidth $ 2 * cellsize
-          hig = div iniHeight $ 2 * cellsize
-      ng <- randomGrid (negate wid, negate hig) (wid, hig)
-      return w { grid = ng, itter = 0 }
-    else return w
--- Update the windowsize
+  (EventKey (Char c) Down _ _) -> case c of
+    'c' ->
+      if paused w then return $ w { grid = emptyGrid, itter = 0 } else return w
+    'r' -> if paused w
+      then do
+        let wid = div iniWidth $ 2 * cellsize
+            hig = div iniHeight $ 2 * cellsize
+        ng <- randomGrid (negate wid, negate hig) (wid, hig)
+        return w { grid = ng, itter = 0 }
+      else return w
+    'h' -> return $ w { showHelp = not $ showHelp w }
+    _   -> return w
   (EventResize (x, y)) -> return $ w { winW = x, winH = y }
--- All other input
   _                    -> return w
   where scalePix x = truncate $ signum x * (abs x + cellsizeF / 2) / cellsizeF
 

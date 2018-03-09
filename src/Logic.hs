@@ -1,6 +1,7 @@
 module Logic
   ( Cord
   , Grid
+  , emptyGrid
   , evolveGrid
   , gridToList
   , toggleCord
@@ -16,6 +17,9 @@ import Control.Monad
 type Cord = (Int, Int)
 
 type Grid = S.Set Cord
+
+emptyGrid :: Grid
+emptyGrid = S.empty
 
 -- Returns the (Alive, Dead) neighbours
 neigh :: Grid -> Cord -> ([Cord], [Cord])
