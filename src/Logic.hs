@@ -9,7 +9,6 @@ module Logic
   , rPentomino
   ) where
 
-import Data.List.Split (chunksOf)
 import qualified Data.Set as S
 import System.Random
 import Control.Monad

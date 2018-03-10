@@ -1,13 +1,13 @@
 module Main where
 
 import           Data.List                        (mapAccumL)
-import           Data.List.Split                  (splitOn)
 import           Data.Semigroup                   ((<>))
 import           Graphics.Gloss
 import           Graphics.Gloss.Interface.IO.Game
 import           Logic
 import           Options.Applicative
 
+windowOffset :: Int
 windowOffset = 30
 
 stepsPerSec :: Int
@@ -131,7 +131,8 @@ handleInput event w = case event of
       (cellsize w)
 
 data Opt = Opt
-  { wSize :: (Int, Int)
+  { hSize :: Int
+  , wSize :: Int
   , cSize :: Int
   }
 
@@ -139,30 +140,32 @@ pOpt :: Parser Opt
 pOpt =
   Opt
     <$> option
-          sizeReader
-          (  long "size"
-          <> short 's'
-          <> help "Window size"
+          auto
+          (  long "height"
+          <> short 'h'
+          <> help "Vertical window size"
           <> showDefault
-          <> value (1000, 500)
-          <> metavar "INT,INT"
+          <> value 500
+          <> metavar "INT"
           )
     <*> option
           auto
-          (  long "cellsize (Resolution)"
-          <> short 'c'
-          <> help "Size of the cells"
+          (  long "width"
+          <> short 'w'
+          <> help "Horisontal window size"
           <> showDefault
-          <> value 5
+          <> value 1000
           <> metavar "INT"
           )
-
-sizeReader :: ReadM (Int, Int)
-sizeReader = do
-  o <- str
-  -- TODO error handling
-  let [w, h] = map read $ splitOn "," o
-  return (w, h)
+    <*> option
+          auto
+          (  long "cellsize"
+          <> short 'c'
+          <> help "Size of the cells in pixels"
+          <> showDefault
+          <> value 3
+          <> metavar "INT"
+          )
 
 main :: IO ()
 main = runWorld =<< execParser opts
@@ -182,13 +185,14 @@ runWorld opt = playIO window
                       handleInput
                       stepWorld
  where
-  window       = InWindow "Hasklife" (wSize opt) (windowOffset, windowOffset)
+  window =
+    InWindow "Hasklife" (wSize opt, hSize opt) (windowOffset, windowOffset)
   initialWorld = World
     { grid     = rPentomino
     , itter    = 0
     , paused   = True
-    , winW     = fst $ wSize opt
-    , winH     = snd $ wSize opt
+    , winW     = wSize opt
+    , winH     = hSize opt
     , cellsize = cSize opt
     , showHelp = True
     }
